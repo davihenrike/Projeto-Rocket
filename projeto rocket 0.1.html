@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quebra-Cabeça do Foguete</title>
+  <style>
+    body { text-align: center; font-family: Arial, sans-serif; }
+    canvas { border: 2px solid #000; margin-top: 20px; cursor: pointer; }
+    #message { font-size: 20px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Monte o Foguete</h1>
+  <canvas id="puzzleCanvas" width="200" height="400"></canvas>
+  <div id="message">Arraste as partes para montar o foguete!</div>
+
+  <script>
+    const canvas = document.getElementById('puzzleCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const rocketParts = [
+      { type: 'top', x: 20, y: 300, width: 60, height: 60, isDragging: false },
+      { type: 'tank', x: 100, y: 300, width: 60, height: 100, isDragging: false },
+      { type: 'base', x: 180, y: 300, width: 60, height: 60, isDragging: false }
+    ];
+
+    const targetPositions = {
+      top: { x: 70, y: 200 },
+      tank: { x: 70, y: 260 },
+      base: { x: 70, y: 360 }
+    };
+
+    let draggingPart = null;
+    let offsetX, offsetY;
+    let completed = false;
+
+    function drawTargetIndicators() {
+      ctx.beginPath();
+      ctx.moveTo(targetPositions.top.x, targetPositions.top.y + 60);
+      ctx.lineTo(targetPositions.top.x + 30, targetPositions.top.y);
+      ctx.lineTo(targetPositions.top.x + 60, targetPositions.top.y + 60);
+      ctx.closePath();
+      ctx.strokeStyle = 'red';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.rect(targetPositions.tank.x, targetPositions.tank.y, 60, 100);
+      ctx.strokeStyle = 'gray';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(targetPositions.base.x, targetPositions.base.y);
+      ctx.lineTo(targetPositions.base.x + 30, targetPositions.base.y + 60);
+      ctx.lineTo(targetPositions.base.x + 60, targetPositions.base.y);
+      ctx.closePath();
+      ctx.strokeStyle = 'orange';
+      ctx.stroke();
+    }
+
+    function drawRocketParts() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawTargetIndicators();
+
+      rocketParts.forEach(part => {
+        ctx.beginPath();
+        if (part.type === 'top') {
+          ctx.moveTo(part.x, part.y + part.height);
+          ctx.lineTo(part.x + part.width / 2, part.y);
+          ctx.lineTo(part.x + part.width, part.y + part.height);
+          ctx.closePath();
+          ctx.fillStyle = 'red';
+        } else if (part.type === 'tank') {
+          ctx.rect(part.x, part.y, part.width, part.height);
+          ctx.fillStyle = 'gray';
+        } else if (part.type === 'base') {
+          ctx.moveTo(part.x, part.y);
+          ctx.lineTo(part.x + part.width / 2, part.y + part.height);
+          ctx.lineTo(part.x + part.width, part.y);
+          ctx.closePath();
+          ctx.fillStyle = 'orange';
+        }
+        ctx.fill();
+      });
+    }
+
+    function checkCompletion() {
+      completed = rocketParts.every(part => {
+        const target = targetPositions[part.type];
+        return Math.abs(part.x - target.x) < 10 && Math.abs(part.y - target.y) < 10;
+      });
+      if (completed) {
+        document.getElementById('message').textContent = "Foguete completo! Preparando para decolar!";
+        setTimeout(launchRocket, 1000);
+      }
+    }
+
+    function launchRocket() {
+      function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        rocketParts.forEach(part => {
+          part.y -= 5;
+        });
+        drawRocketParts();
+        if (rocketParts[2].y + rocketParts[2].height > 0) {
+          requestAnimationFrame(animate);
+        } else {
+          document.getElementById('message').textContent = "Decolagem completa! Você venceu!";
+        }
+      }
+      animate();
+    }
+
+    function startDragging(e) {
+      if (completed) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+      const mouseY = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+      for (const part of rocketParts) {
+        if (
+          mouseX >= part.x && mouseX <= part.x + part.width &&
+          mouseY >= part.y && mouseY <= part.y + part.height
+        ) {
+          draggingPart = part;
+          offsetX = mouseX - part.x;
+          offsetY = mouseY - part.y;
+          part.isDragging = true;
+          break;
+        }
+      }
+    }
+
+    function drag(e) {
+      if (!draggingPart) return;
+
+      const rect = canvas.getBoundingClientRect();
+      draggingPart.x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left - offsetX;
+      draggingPart.y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top - offsetY;
+
+      drawRocketParts();
+    }
+
+    function stopDragging() {
+      if (draggingPart) {
+        const target = targetPositions[draggingPart.type];
+        if (
+          Math.abs(draggingPart.x - target.x) < 10 &&
+          Math.abs(draggingPart.y - target.y) < 10
+        ) {
+          draggingPart.x = target.x;
+          draggingPart.y = target.y;
+        }
+        draggingPart.isDragging = false;
+        draggingPart = null;
+        drawRocketParts();
+        checkCompletion();
+      }
+    }
+
+    canvas.addEventListener('mousedown', startDragging);
+    canvas.addEventListener('mousemove', drag);
+    canvas.addEventListener('mouseup', stopDragging);
+    canvas.addEventListener('touchstart', startDragging);
+    canvas.addEventListener('touchmove', drag);
+    canvas.addEventListener('touchend', stopDragging);
+
+    drawRocketParts();
+  </script>
+</body>
+</html>
